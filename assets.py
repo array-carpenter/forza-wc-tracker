@@ -18,6 +18,10 @@ import requests
 DATA_DIR = Path(__file__).parent / "data"
 HEADSHOTS_FILE = DATA_DIR / "headshots.json"
 HEADSHOTS_MANUAL_FILE = DATA_DIR / "headshots_manual.json"
+CLUBS_FILE = DATA_DIR / "clubs.json"
+
+# Disambiguate roster club names from foreign clubs that share a name.
+CLUB_ALIAS = {"Inter": "Inter Milan"}
 
 UA = {"User-Agent": "Mozilla/5.0"}
 WIKI_UA = {"User-Agent": "forza-wc-tracker/1.0 (personal project)"}
@@ -46,6 +50,48 @@ def _ascii(text: str) -> str:
 def build_flag_map(nations: list[str]) -> dict:
     """Return {nation: circular-flag-url} for the given roster nations."""
     return {n: FLAG_BASE.format(code=NATION_ISO[n]) for n in nations if n in NATION_ISO}
+
+
+# ----------------------------------------------------------------- clubs ----
+def _club_badge(club: str) -> str | None:
+    """Find an Italian club's badge on TheSportsDB (Italy filter avoids
+    foreign clubs that share a name, e.g. another 'Inter')."""
+    query = CLUB_ALIAS.get(club, club)
+    try:
+        r = requests.get(
+            "https://www.thesportsdb.com/api/v1/json/3/searchteams.php",
+            params={"t": query},
+            headers=UA,
+            timeout=15,
+        )
+        if r.status_code != 200:
+            return None
+        teams = [t for t in (r.json().get("teams") or []) if t.get("strSport") == "Soccer"]
+        italian = [t for t in teams if (t.get("strCountry") or "").lower() == "italy"]
+        pick = (italian or teams or [None])[0]
+        return pick.get("strBadge") if pick else None
+    except Exception:
+        return None
+
+
+def build_club_map(clubs: list[str]) -> dict:
+    """Build/extend {club: badge_url}, fetching only uncached clubs."""
+    cache: dict[str, str] = {}
+    if CLUBS_FILE.exists():
+        cache = json.loads(CLUBS_FILE.read_text())
+
+    changed = False
+    for club in clubs:
+        if cache.get(club):
+            continue
+        cache[club] = _club_badge(club) or ""
+        changed = True
+        time.sleep(1.5)
+
+    if changed:
+        DATA_DIR.mkdir(exist_ok=True)
+        CLUBS_FILE.write_text(json.dumps(cache))
+    return cache
 
 
 # ------------------------------------------------------------- headshots ----

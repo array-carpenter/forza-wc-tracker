@@ -1,5 +1,7 @@
 """FORZA CALCIO 2026 World Cup tracker for Serie A's exported players."""
 
+import base64
+import mimetypes
 from pathlib import Path
 
 import pandas as pd
@@ -11,8 +13,11 @@ from roster import load_roster
 from stats import build_table
 
 ASSETS = Path(__file__).parent / "assets"
+FONTS = ASSETS / "fonts"
 WC_LOGO = ASSETS / "wc_2026_logo.png"
 SERIE_A_LOGO = ASSETS / "serie_a_logo.png"
+SPADE_LOGO = ASSETS / "spade_soccer_logo.png"
+FORZA_LOGO = ASSETS / "forza_calcio_white.png"
 
 st.set_page_config(
     page_title="FORZA CALCIO World Cup Tracker",
@@ -20,45 +25,67 @@ st.set_page_config(
     layout="wide",
 )
 
-FONT_CSS = """
+SIDEBAR_BLUE = "#002bfc"
+
+
+def _data_uri(path: Path) -> str:
+    mime = mimetypes.guess_type(path.name)[0] or "image/png"
+    return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
+
+
+def _lp_font_face() -> str:
+    """Embed the LP Brighter Side Demo font if its file is in assets/fonts/."""
+    if not FONTS.exists():
+        return ""
+    for f in FONTS.iterdir():
+        if "brighter" in f.name.lower() and f.suffix.lower() in (".ttf", ".otf", ".woff", ".woff2"):
+            fmt = {"ttf": "truetype", "otf": "opentype"}.get(f.suffix.lower().lstrip("."), "woff2")
+            return (
+                "@font-face { font-family: 'LP Brighter Side Demo'; "
+                f"src: url('{_data_uri(f)}') format('{fmt}'); }}"
+            )
+    return ""
+
+
+def build_style() -> str:
+    return f"""
 <style>
-html, body, [class*="st-"], .stApp, .stApp * {
+@import url('https://fonts.googleapis.com/css2?family=Abril+Fatface&display=swap');
+{_lp_font_face()}
+html, body, [class*="st-"], .stApp, .stApp * {{
     font-family: Helvetica, "Helvetica Neue", Arial, sans-serif !important;
-}
+}}
+/* Primary title + secondary headings use the brand display fonts. */
+.stApp h1, .stApp h1 * {{
+    font-family: 'LP Brighter Side Demo', 'Abril Fatface', serif !important;
+}}
+.stApp h2, .stApp h3, .stApp h2 *, .stApp h3 * {{
+    font-family: 'Abril Fatface', 'Abril Display', serif !important;
+}}
 /* Keep Streamlit's Material icon ligatures on their icon font. */
 [data-testid="stIconMaterial"],
 span[class*="material-symbols"],
 span[class*="material-icons"],
-.material-symbols-rounded, .material-symbols-outlined, .material-icons {
+.material-symbols-rounded, .material-symbols-outlined, .material-icons {{
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined',
         'Material Icons' !important;
-}
+}}
 /* Sidebar: deep-blue panel, white text, white input bars. */
-[data-testid="stSidebar"] {
-    background-color: #0B10A2 !important;
-}
-[data-testid="stSidebar"] * {
-    color: #ffffff !important;
-}
-[data-testid="stSidebar"] hr {
-    border-color: rgba(255, 255, 255, 0.4) !important;
-}
+[data-testid="stSidebar"] {{ background-color: {SIDEBAR_BLUE} !important; }}
+[data-testid="stSidebar"] * {{ color: #ffffff !important; }}
+[data-testid="stSidebar"] hr {{ border-color: rgba(255, 255, 255, 0.4) !important; }}
 [data-testid="stSidebar"] input,
 [data-testid="stSidebar"] textarea,
-[data-testid="stSidebar"] [data-baseweb="select"] > div {
-    background-color: #ffffff !important;
-}
+[data-testid="stSidebar"] [data-baseweb="select"] > div {{ background-color: #ffffff !important; }}
 [data-testid="stSidebar"] input,
 [data-testid="stSidebar"] textarea,
-[data-testid="stSidebar"] [data-baseweb="select"] * {
-    color: #111111 !important;
-}
+[data-testid="stSidebar"] [data-baseweb="select"] * {{ color: #111111 !important; }}
 [data-testid="stSidebar"] .stButton button,
-[data-testid="stSidebar"] .stButton button * {
+[data-testid="stSidebar"] .stButton button * {{
     background-color: #ffffff !important;
-    color: #0B10A2 !important;
+    color: {SIDEBAR_BLUE} !important;
     border: none !important;
-}
+}}
 </style>
 """
 
@@ -70,7 +97,8 @@ def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
     nations = sorted(roster["Nation"].unique())
     flag_map = assets.build_flag_map(nations)
     headshot_map = assets.resolve_headshots()
-    table = build_table(roster, payload.get("players", []), flag_map, headshot_map)
+    club_map = assets.build_club_map(sorted(roster["Club"].unique()))
+    table = build_table(roster, payload.get("players", []), flag_map, headshot_map, club_map)
     return table, payload
 
 
@@ -87,7 +115,7 @@ def data_status_banner(payload: dict, matched: int, total: int) -> None:
 
 
 def player_card(row: pd.Series) -> None:
-    photo, crest = row.get("Headshot"), row.get("Crest")
+    photo, crest, club_crest = row.get("Headshot"), row.get("Crest"), row.get("ClubCrest")
     pic_col, name_col = st.columns([1, 2], vertical_alignment="center")
     with pic_col:
         if photo:
@@ -98,17 +126,37 @@ def player_card(row: pd.Series) -> None:
         crest_img = (
             f"<img src='{crest}' height='18' style='vertical-align:middle'> " if crest else ""
         )
+        club_img = (
+            f"<img src='{club_crest}' height='15' style='vertical-align:middle'> "
+            if club_crest else ""
+        )
         st.markdown(f"**{row['Player']}**")
         st.markdown(f"{crest_img}{row['Nation']}", unsafe_allow_html=True)
-        st.caption(f"{row['Club']} · {row['Position']} · {int(row['Apps'])} apps")
-    c1, c2, c3 = st.columns(3)
+        st.markdown(
+            f"<span style='color:#808495;font-size:0.85rem'>{club_img}{row['Club']} · "
+            f"{row['Position']} · {int(row['Apps'])} apps</span>",
+            unsafe_allow_html=True,
+        )
+    c1, c2 = st.columns(2)
     c1.metric("Goals", int(row["Goals"]))
     c2.metric("Assists", int(row["Assists"]))
-    c3.metric("G+A", int(row["G+A"]))
 
 
 def app_header() -> None:
-    st.markdown(FONT_CSS, unsafe_allow_html=True)
+    st.markdown(build_style(), unsafe_allow_html=True)
+
+    # Collaboration banner: The Spade x FORZA CALCIO (white logos on brand blue).
+    if SPADE_LOGO.exists() and FORZA_LOGO.exists():
+        st.markdown(
+            f"<div style='background:{SIDEBAR_BLUE};border-radius:14px;padding:16px 24px;"
+            "display:flex;align-items:center;justify-content:center;gap:28px;"
+            "margin-bottom:14px;'>"
+            f"<img src='{_data_uri(SPADE_LOGO)}' style='height:56px;'>"
+            "<span style='color:#fff;font-size:30px;font-weight:300;'>&times;</span>"
+            f"<img src='{_data_uri(FORZA_LOGO)}' style='height:56px;'></div>",
+            unsafe_allow_html=True,
+        )
+
     left, mid, right = st.columns([1, 6, 1], vertical_alignment="center")
     with left:
         if WC_LOGO.exists():
@@ -164,7 +212,7 @@ def main() -> None:
     st.subheader("Top performers")
     rank_metric = st.radio(
         "Rank by",
-        ["Goals", "G+A", "Assists"],
+        ["Goals", "Assists"],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -182,9 +230,11 @@ def main() -> None:
 
     # ---- Sortable / filterable table ----
     st.subheader(f"All players ({len(filtered)})")
-    table_cols = ["Apps", "Goals", "Assists", "Penalties", "G+A"]
+    table_cols = ["Apps", "Goals", "Assists", "Yellow", "Red"]
     display = filtered.sort_values("Goals", ascending=False)
-    show_cols = ["Headshot", "Player", "Crest", "Nation", "Club", "Position"] + table_cols
+    show_cols = (
+        ["Headshot", "Player", "Crest", "Nation", "ClubCrest", "Club", "Position"] + table_cols
+    )
     st.dataframe(
         display[show_cols],
         width="stretch",
@@ -193,6 +243,9 @@ def main() -> None:
         column_config={
             "Headshot": st.column_config.ImageColumn(" "),
             "Crest": st.column_config.ImageColumn(" "),
+            "ClubCrest": st.column_config.ImageColumn(" "),
+            "Yellow": st.column_config.NumberColumn("YC", help="Yellow cards"),
+            "Red": st.column_config.NumberColumn("RC", help="Red cards"),
         },
     )
     st.caption("Click any column header to sort by it.")

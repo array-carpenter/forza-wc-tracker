@@ -10,7 +10,9 @@ NATION_ALIASES = {
     "USA": "United States",
 }
 
-STAT_COLUMNS = ["Apps", "Goals", "Assists", "Penalties"]
+# Apps/Goals come from the free scorers board; Assists/Yellow/Red are placeholders
+# that only populate from a paid source (kept 0 here).
+STAT_COLUMNS = ["Apps", "Goals", "Assists", "Yellow", "Red"]
 
 
 def _normalize(text: str) -> str:
@@ -63,6 +65,7 @@ def build_table(
     records: list[dict],
     crest_map: dict | None = None,
     headshot_map: dict | None = None,
+    club_map: dict | None = None,
 ) -> pd.DataFrame:
     """Merge roster with WC scorer stats and add derived performance metrics."""
     index = _index_stats(records)
@@ -83,9 +86,8 @@ def build_table(
     df = pd.concat([df.reset_index(drop=True), stats_df], axis=1)
     df["Matched"] = matched_flags
 
-    df["G+A"] = df["Goals"] + df["Assists"]
-
     df["Crest"] = df["Nation"].map(crest_map or {}).fillna("")
     df["Headshot"] = df["Player"].map(headshot_map or {}).fillna("")
+    df["ClubCrest"] = df["Club"].map(club_map or {}).fillna("")
 
     return df
