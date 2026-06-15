@@ -15,6 +15,24 @@ import requests
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world"
 WC_START = datetime.date(2026, 6, 11)
 
+# ESPN box-score field -> our column name. All are per-match counts we sum.
+STAT_FIELDS = {
+    "appearances": "Apps",
+    "subIns": "Sub",
+    "totalGoals": "Goals",
+    "goalAssists": "Assists",
+    "totalShots": "Shots",
+    "shotsOnTarget": "SOG",
+    "yellowCards": "Yellow",
+    "redCards": "Red",
+    "foulsCommitted": "Fouls",
+    "foulsSuffered": "Fouled",
+    "offsides": "Offsides",
+    "ownGoals": "Own Goals",
+    "saves": "Saves",
+    "goalsConceded": "Conceded",
+}
+
 CACHE_DIR = Path(__file__).parent / "data"
 CACHE_FILE = CACHE_DIR / "wc_players_cache.json"
 
@@ -62,13 +80,10 @@ def _aggregate(event_ids: set[str]) -> list[dict]:
                 rec = agg.setdefault(
                     key,
                     {"name": ath.get("displayName", ""), "nationality": nation,
-                     "Apps": 0, "Goals": 0, "Assists": 0, "Yellow": 0, "Red": 0},
+                     **{col: 0 for col in STAT_FIELDS.values()}},
                 )
-                rec["Apps"] += int(d.get("appearances", 0) or 0)
-                rec["Goals"] += int(d.get("totalGoals", 0) or 0)
-                rec["Assists"] += int(d.get("goalAssists", 0) or 0)
-                rec["Yellow"] += int(d.get("yellowCards", 0) or 0)
-                rec["Red"] += int(d.get("redCards", 0) or 0)
+                for field, col in STAT_FIELDS.items():
+                    rec[col] += int(d.get(field, 0) or 0)
         time.sleep(0.15)
     return list(agg.values())
 

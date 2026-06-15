@@ -13,7 +13,6 @@ from roster import load_roster
 from stats import build_table
 
 ASSETS = Path(__file__).parent / "assets"
-FONTS = ASSETS / "fonts"
 WC_LOGO = ASSETS / "wc_2026_logo.png"
 SPADE_LOGO = ASSETS / "spade_soccer_logo.png"
 FORZA_LOGO = ASSETS / "forza_calcio_white.png"
@@ -32,34 +31,11 @@ def _data_uri(path: Path) -> str:
     return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
 
 
-def _lp_font_face() -> str:
-    """Embed the LP Brighter Side Demo font if its file is in assets/fonts/."""
-    if not FONTS.exists():
-        return ""
-    for f in FONTS.iterdir():
-        if "brighter" in f.name.lower() and f.suffix.lower() in (".ttf", ".otf", ".woff", ".woff2"):
-            fmt = {"ttf": "truetype", "otf": "opentype"}.get(f.suffix.lower().lstrip("."), "woff2")
-            return (
-                "@font-face { font-family: 'LP Brighter Side Demo'; "
-                f"src: url('{_data_uri(f)}') format('{fmt}'); }}"
-            )
-    return ""
-
-
 def build_style() -> str:
     return f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Abril+Fatface&display=swap');
-{_lp_font_face()}
 html, body, [class*="st-"], .stApp, .stApp * {{
     font-family: Helvetica, "Helvetica Neue", Arial, sans-serif !important;
-}}
-/* Primary title + secondary headings use the brand display fonts. */
-.stApp h1, .stApp h1 * {{
-    font-family: 'LP Brighter Side Demo', 'Abril Fatface', serif !important;
-}}
-.stApp h2, .stApp h3, .stApp h2 *, .stApp h3 * {{
-    font-family: 'Abril Fatface', 'Abril Display', serif !important;
 }}
 /* Keep Streamlit's Material icon ligatures on their icon font. */
 [data-testid="stIconMaterial"],
@@ -208,7 +184,7 @@ def main() -> None:
     st.subheader("Top performers")
     rank_metric = st.radio(
         "Rank by",
-        ["Goals", "Assists"],
+        ["Goals", "Assists", "Shots", "Apps"],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -224,23 +200,41 @@ def main() -> None:
 
     # ---- Sortable / filterable table ----
     st.subheader(f"All players ({len(filtered)})")
-    table_cols = ["Apps", "Goals", "Assists", "Yellow", "Red"]
+    # (column, short header, tooltip) for every stat ESPN gives us.
+    stat_meta = [
+        ("Apps", "Apps", "Appearances"),
+        ("Sub", "Sub", "Substitute appearances"),
+        ("Goals", "G", "Goals"),
+        ("Assists", "A", "Assists"),
+        ("Shots", "Sh", "Total shots"),
+        ("SOG", "SOG", "Shots on goal"),
+        ("Yellow", "YC", "Yellow cards"),
+        ("Red", "RC", "Red cards"),
+        ("Fouls", "FC", "Fouls committed"),
+        ("Fouled", "FS", "Fouls suffered"),
+        ("Offsides", "Off", "Offsides"),
+        ("Own Goals", "OG", "Own goals"),
+        ("Saves", "Sv", "Saves (goalkeeper)"),
+        ("Conceded", "GA", "Goals conceded (goalkeeper)"),
+    ]
+    table_cols = [c for c, _, _ in stat_meta]
     display = filtered.sort_values("Goals", ascending=False)
     show_cols = (
         ["Headshot", "Player", "Crest", "Nation", "ClubCrest", "Club", "Position"] + table_cols
     )
+    column_config = {
+        "Headshot": st.column_config.ImageColumn(" "),
+        "Crest": st.column_config.ImageColumn(" "),
+        "ClubCrest": st.column_config.ImageColumn(" "),
+    }
+    for col, header, tip in stat_meta:
+        column_config[col] = st.column_config.NumberColumn(header, help=tip, width="small")
     st.dataframe(
         display[show_cols],
         width="stretch",
         hide_index=True,
         height=560,
-        column_config={
-            "Headshot": st.column_config.ImageColumn(" "),
-            "Crest": st.column_config.ImageColumn(" "),
-            "ClubCrest": st.column_config.ImageColumn(" "),
-            "Yellow": st.column_config.NumberColumn("YC", help="Yellow cards"),
-            "Red": st.column_config.NumberColumn("RC", help="Red cards"),
-        },
+        column_config=column_config,
     )
     st.caption("Click any column header to sort by it.")
 

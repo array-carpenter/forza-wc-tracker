@@ -9,9 +9,11 @@ NATION_ALIASES = {
     "USA": "United States",
 }
 
-# Apps/Goals come from the free scorers board; Assists/Yellow/Red are placeholders
-# that only populate from a paid source (kept 0 here).
-STAT_COLUMNS = ["Apps", "Goals", "Assists", "Yellow", "Red"]
+# Per-player stats aggregated from ESPN match box scores.
+STAT_COLUMNS = [
+    "Apps", "Sub", "Goals", "Assists", "Shots", "SOG",
+    "Yellow", "Red", "Fouls", "Fouled", "Offsides", "Own Goals", "Saves", "Conceded",
+]
 
 
 def _normalize(text: str) -> str:
