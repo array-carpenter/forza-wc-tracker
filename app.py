@@ -184,7 +184,7 @@ def main() -> None:
     st.subheader("Top performers")
     rank_metric = st.radio(
         "Rank by",
-        ["Goals", "Assists", "Shots", "Apps"],
+        [m for m in ["Goals", "Assists", "Shots", "Apps"] if m in filtered.columns],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -217,18 +217,19 @@ def main() -> None:
         ("Saves", "Sv", "Saves (goalkeeper)"),
         ("Conceded", "GA", "Goals conceded (goalkeeper)"),
     ]
-    table_cols = [c for c, _, _ in stat_meta]
     display = filtered.sort_values("Goals", ascending=False)
-    show_cols = (
-        ["Headshot", "Player", "Crest", "Nation", "ClubCrest", "Club", "Position"] + table_cols
-    )
+    base_cols = ["Headshot", "Player", "Crest", "Nation", "ClubCrest", "Club", "Position"]
+    table_cols = [c for c, _, _ in stat_meta if c in display.columns]
+    # Only request columns that exist (survives a partial module reload on deploy).
+    show_cols = [c for c in base_cols + table_cols if c in display.columns]
     column_config = {
         "Headshot": st.column_config.ImageColumn(" "),
         "Crest": st.column_config.ImageColumn(" "),
         "ClubCrest": st.column_config.ImageColumn(" "),
     }
     for col, header, tip in stat_meta:
-        column_config[col] = st.column_config.NumberColumn(header, help=tip, width="small")
+        if col in display.columns:
+            column_config[col] = st.column_config.NumberColumn(header, help=tip, width="small")
     st.dataframe(
         display[show_cols],
         width="stretch",
