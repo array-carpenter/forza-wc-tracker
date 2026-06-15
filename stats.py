@@ -4,9 +4,8 @@ import unicodedata
 
 import pandas as pd
 
-# Roster nation spelling -> football-data.org nationality spelling.
+# Roster nation spelling -> ESPN national-team name (for match disambiguation).
 NATION_ALIASES = {
-    "Turkiye": "Turkey",
     "USA": "United States",
 }
 

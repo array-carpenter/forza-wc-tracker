@@ -110,14 +110,7 @@ def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
 
 
 def data_status_banner(payload: dict, matched: int, total: int) -> None:
-    source = payload.get("source")
-    if source == "no_key":
-        st.warning(
-            "No token set. Showing the roster with empty stats. Add "
-            "`FOOTBALL_DATA_TOKEN` to `.streamlit/secrets.toml` (free token at "
-            "football-data.org), then hit **Refresh stats**."
-        )
-    elif source == "error":
+    if payload.get("source") == "error":
         st.error(f"Couldn't reach the stats API: {payload.get('error')}")
 
 

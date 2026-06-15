@@ -3,18 +3,22 @@
 A Streamlit app that tracks Serie A's exported players through the 2026 World
 Cup. Top-performer cards sit on top; a filterable, sortable table sits below.
 
+A collaboration between Forza Calcio and The Spade.
+
 ## What it does
 
 - Loads the player roster from `data/roster_raw.csv` (the exported FORZA CALCIO sheet).
-- Auto-fetches World Cup scorer stats from
-  [football-data.org](https://www.football-data.org/) and matches them to the
-  roster by accent-normalized name + nationality.
-- Tracks **Apps** (matches played), **Goals**, **Assists**, **Penalties**, plus
-  derived **G+A** and a composite **Score**.
-- Shows **national-team crests** (football-data.org) and **player headshots**
-  (TheSportsDB → Wikipedia, with hand-picked overrides) on the cards and table.
+- Auto-fetches per-player World Cup stats from
+  [ESPN's free API](https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard)
+  by aggregating every completed match's box score, and matches them to the
+  roster by accent-normalized name. **No API key required.**
+- Tracks **Apps** (matches played), **Goals**, **Assists**, **Yellow**, and **Red**
+  cards for every player who features, not just scorers.
+- Shows **circular nation flags** (circle-flags), **club badges** (TheSportsDB,
+  with a hand-picked black Juventus badge), and **player headshots**
+  (TheSportsDB → Wikipedia, with hand-picked overrides).
 - Filters by nation, club, position, and free-text search; sorts by any stat.
-- Caches the API pull to disk; a **Refresh stats** button re-pulls.
+- Caches the fetch to disk; a **Refresh stats** button re-pulls.
 
 ## Setup
 
@@ -23,14 +27,7 @@ uv venv --python 3.13
 uv pip install -r requirements.txt
 ```
 
-Add your free football-data.org token:
-
-```bash
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-# then edit secrets.toml and paste your token
-```
-
-(Or set `FOOTBALL_DATA_TOKEN` in your environment.)
+No keys or secrets needed — every data source is free and keyless.
 
 ## Run
 
@@ -38,30 +35,26 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 .venv/bin/streamlit run app.py
 ```
 
-The app runs without a token too. It shows the roster with empty stats and a
-banner, then fills in once a token is set and you click **Refresh stats**.
-
 ## Files
 
 | File | Role |
 |------|------|
 | `roster.py` | Parse + clean the roster sheet (incl. name/nation fixes) |
-| `api_client.py` | Fetch + cache World Cup scorer stats |
-| `assets.py` | Resolve + cache national-team crests and player headshots |
+| `api_client.py` | Aggregate per-player stats from ESPN's match box scores |
+| `assets.py` | Resolve + cache flags, club badges, and player headshots |
 | `stats.py` | Match roster ↔ stats, compute derived metrics |
 | `app.py` | Streamlit UI |
 
 To pin a specific headshot for any player, add an entry to
 `data/headshots_manual.json`, either an image URL or a path to a file bundled
-under `assets/headshots/` (handy when a source blocks hotlinking).
+under `assets/headshots/` (handy when a source blocks hotlinking). Club-badge
+overrides live in `assets.CLUB_OVERRIDE`.
 
 ## Data-source notes
 
-- World Cup competition code is `WC`; the 2026 edition runs June 11 – July 19, 2026.
-- football-data.org's **free** World Cup data is the **scorers board**: it covers
-  goals, penalties, and matches played, and only lists players who have scored.
-  A roster player shows up the moment they score; until then they sit at zero.
-- **Assists are not published** for the World Cup on this source, so the Assists
-  column stays at 0. Goals/apps/penalties are the live signal.
-- Rate limit is ~10 requests/minute (no hard daily cap). The disk cache means a
-  normal session makes one request.
+- The 2026 World Cup runs June 11 – July 19, 2026. ESPN's league code is `fifa.world`.
+- Stats are aggregated from each completed match's roster box score, so a player
+  appears the moment their nation plays — appearances, goals, assists, and cards
+  all populate, regardless of whether they've scored.
+- The on-disk cache (`data/wc_players_cache.json`, gitignored) is refreshed on a
+  cold start or when you click **Refresh stats**.

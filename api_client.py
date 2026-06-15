@@ -1,94 +1,93 @@
-"""Fetch 2026 World Cup scorer statistics from football-data.org.
+"""Fetch 2026 World Cup per-player stats from ESPN's free API.
 
-The free tier covers the World Cup via its scorers board, which provides
-matches played, goals, assists and penalties per player. There is no
-minutes or rating data on this endpoint.
-
-Get a free token at https://www.football-data.org/client/register and set it
-as the FOOTBALL_DATA_TOKEN environment variable or in .streamlit/secrets.toml.
+ESPN exposes per-match rosters with full per-player stats (appearances,
+goals, assists, yellow/red cards) for every player who features, not just
+scorers. We aggregate those across every completed match. No API key.
 """
 
+import datetime
 import json
-import os
 import time
-import unicodedata
 from pathlib import Path
 
 import requests
 
-BASE_URL = "https://api.football-data.org/v4"
-COMPETITION = "WC"  # FIFA World Cup
-SCORERS_LIMIT = 200  # pull a deep board so we catch every roster player who scored
+ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world"
+WC_START = datetime.date(2026, 6, 11)
 
 CACHE_DIR = Path(__file__).parent / "data"
 CACHE_FILE = CACHE_DIR / "wc_players_cache.json"
 
 
-def get_token() -> str | None:
-    """Token from env var, falling back to Streamlit secrets if present."""
-    token = os.environ.get("FOOTBALL_DATA_TOKEN")
-    if token:
-        return token.strip()
-    try:
-        import streamlit as st
-
-        return st.secrets.get("FOOTBALL_DATA_TOKEN")
-    except Exception:
-        return None
+def get_token() -> None:
+    """ESPN needs no key; kept for API compatibility."""
+    return None
 
 
-def _normalize_record(entry: dict) -> dict:
-    """Flatten one scorers entry into the app's normalized stat schema."""
-    player = entry.get("player") or {}
-    team = entry.get("team") or {}
-    return {
-        "name": player.get("name") or "",
-        "nationality": player.get("nationality") or "",
-        "team": team.get("name") or "",
-        "Apps": entry.get("playedMatches") or 0,
-        "Goals": entry.get("goals") or 0,
-        "Assists": entry.get("assists") or 0,
-        "Penalties": entry.get("penalties") or 0,
-    }
+def _completed_event_ids() -> set[str]:
+    """Every completed World Cup match id from kickoff through today."""
+    ids: set[str] = set()
+    day, today = WC_START, datetime.date.today()
+    while day <= today:
+        try:
+            resp = requests.get(
+                f"{ESPN}/scoreboard", params={"dates": day.strftime("%Y%m%d")}, timeout=20
+            )
+            for e in resp.json().get("events", []):
+                if e.get("status", {}).get("type", {}).get("completed"):
+                    ids.add(e["id"])
+        except Exception:
+            pass
+        day += datetime.timedelta(days=1)
+    return ids
 
 
-def _fetch_scorers(token: str) -> list[dict]:
-    resp = requests.get(
-        f"{BASE_URL}/competitions/{COMPETITION}/scorers",
-        headers={"X-Auth-Token": token},
-        params={"limit": SCORERS_LIMIT},
-        timeout=20,
-    )
-    resp.raise_for_status()
-    payload = resp.json()
-    return [_normalize_record(e) for e in payload.get("scorers", [])]
+def _aggregate(event_ids: set[str]) -> list[dict]:
+    """Sum each player's stats across the given matches."""
+    agg: dict[str, dict] = {}
+    for eid in event_ids:
+        try:
+            summary = requests.get(f"{ESPN}/summary", params={"event": eid}, timeout=20).json()
+        except Exception:
+            continue
+        for team in summary.get("rosters", []) or []:
+            nation = (team.get("team") or {}).get("displayName", "")
+            for p in team.get("roster", []) or []:
+                stats = p.get("stats")
+                if not stats:
+                    continue
+                d = {s["name"]: s.get("value", 0) for s in stats}
+                ath = p.get("athlete", {})
+                key = str(ath.get("id") or ath.get("displayName", ""))
+                rec = agg.setdefault(
+                    key,
+                    {"name": ath.get("displayName", ""), "nationality": nation,
+                     "Apps": 0, "Goals": 0, "Assists": 0, "Yellow": 0, "Red": 0},
+                )
+                rec["Apps"] += int(d.get("appearances", 0) or 0)
+                rec["Goals"] += int(d.get("totalGoals", 0) or 0)
+                rec["Assists"] += int(d.get("goalAssists", 0) or 0)
+                rec["Yellow"] += int(d.get("yellowCards", 0) or 0)
+                rec["Red"] += int(d.get("redCards", 0) or 0)
+        time.sleep(0.15)
+    return list(agg.values())
 
 
 def load_player_stats(force_refresh: bool = False) -> dict:
-    """Return cached WC scorer stats, fetching from the API when needed.
-
-    Shape: {"fetched_at": iso, "players": [...], "source": ...}.
-    Falls back to an empty payload (so the app still renders the roster) when
-    no token is set or the request fails.
-    """
+    """Return cached WC player stats, aggregating from ESPN when needed."""
     if CACHE_FILE.exists() and not force_refresh:
         return json.loads(CACHE_FILE.read_text())
-
-    token = get_token()
-    if not token:
-        return {"fetched_at": None, "players": [], "source": "no_key"}
-
     try:
-        players = _fetch_scorers(token)
+        players = _aggregate(_completed_event_ids())
         result = {
             "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "players": players,
-            "source": "api",
+            "source": "espn",
         }
         CACHE_DIR.mkdir(exist_ok=True)
         CACHE_FILE.write_text(json.dumps(result))
         return result
-    except Exception as exc:  # network/quota/parse failures shouldn't crash the app
+    except Exception as exc:
         return {"fetched_at": None, "players": [], "source": "error", "error": str(exc)}
 
 
