@@ -15,7 +15,6 @@ from stats import build_table
 ASSETS = Path(__file__).parent / "assets"
 FONTS = ASSETS / "fonts"
 WC_LOGO = ASSETS / "wc_2026_logo.png"
-SERIE_A_LOGO = ASSETS / "serie_a_logo.png"
 SPADE_LOGO = ASSETS / "spade_soccer_logo.png"
 FORZA_LOGO = ASSETS / "forza_calcio_white.png"
 
@@ -165,7 +164,7 @@ def app_header() -> None:
             unsafe_allow_html=True,
         )
 
-    left, mid, right = st.columns([1, 6, 1], vertical_alignment="center")
+    left, mid = st.columns([1, 7], vertical_alignment="center")
     with left:
         if WC_LOGO.exists():
             st.image(str(WC_LOGO), width="stretch")
@@ -174,9 +173,6 @@ def app_header() -> None:
         st.caption(
             "Forza Calcio and The Spade present a Serie A/B World Cup Player Stats Tracker"
         )
-    with right:
-        if SERIE_A_LOGO.exists():
-            st.image(str(SERIE_A_LOGO), width="stretch")
 
 
 def main() -> None:
