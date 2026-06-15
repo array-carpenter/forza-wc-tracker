@@ -34,9 +34,9 @@ def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
     payload = api_client.load_player_stats()
     roster = load_roster()
     nations = sorted(roster["Nation"].unique())
-    crest_map = assets.build_crest_map(api_client.get_token(), nations)
+    flag_map = assets.build_flag_map(nations)
     headshot_map = assets.resolve_headshots()
-    table = build_table(roster, payload.get("players", []), crest_map, headshot_map)
+    table = build_table(roster, payload.get("players", []), flag_map, headshot_map)
     return table, payload
 
 
@@ -83,13 +83,15 @@ def player_card(row: pd.Series) -> None:
 def app_header() -> None:
     st.markdown(FONT_CSS, unsafe_allow_html=True)
     left, mid, right = st.columns([1, 6, 1], vertical_alignment="center")
-    if WC_LOGO.exists():
-        left.image(str(WC_LOGO), width="stretch")
+    with left:
+        if WC_LOGO.exists():
+            st.image(str(WC_LOGO), width="stretch")
     with mid:
         st.title("FORZA CALCIO — 2026 World Cup Tracker")
         st.caption("Serie A's exported talent, tracked through the 2026 World Cup.")
-    if SERIE_A_LOGO.exists():
-        right.image(str(SERIE_A_LOGO), width="stretch")
+    with right:
+        if SERIE_A_LOGO.exists():
+            st.image(str(SERIE_A_LOGO), width="stretch")
 
 
 def main() -> None:

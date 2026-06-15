@@ -1,8 +1,9 @@
-"""Resolve national-team crests and player headshots, cached to disk.
+"""Resolve national-team flags and player headshots.
 
-Crests come from football-data.org (the same token as the stats). Headshots
-come from TheSportsDB's free tier, looked up once per player by name and
-cached so the deployed app never re-queries.
+Flags are circular icons from circle-flags (hatscripts), addressed by ISO
+country code, so the mapping is deterministic and needs no API. Headshots
+come from TheSportsDB's free tier (Wikipedia fallback), looked up once per
+player by name and cached so the deployed app never re-queries.
 """
 
 import base64
@@ -15,7 +16,6 @@ from pathlib import Path
 import requests
 
 DATA_DIR = Path(__file__).parent / "data"
-CRESTS_FILE = DATA_DIR / "crests.json"
 HEADSHOTS_FILE = DATA_DIR / "headshots.json"
 HEADSHOTS_MANUAL_FILE = DATA_DIR / "headshots_manual.json"
 
@@ -23,11 +23,17 @@ UA = {"User-Agent": "Mozilla/5.0"}
 WIKI_UA = {"User-Agent": "forza-wc-tracker/1.0 (personal project)"}
 SPORTSDB_KEY = "3"  # free public test key
 
-# Roster nation spelling -> football-data team name (for crest lookup).
-# (Bosnia-Herzegovina already matches the API spelling exactly.)
-NATION_TEAM_NAMES = {
-    "Turkiye": "Turkey",
-    "USA": "United States",
+FLAG_BASE = "https://hatscripts.github.io/circle-flags/flags/{code}.svg"
+
+# Roster nation spelling -> ISO 3166-1 alpha-2 (gb-sct for Scotland).
+NATION_ISO = {
+    "Algeria": "dz", "Argentina": "ar", "Australia": "au", "Austria": "at",
+    "Belgium": "be", "Bosnia-Herzegovina": "ba", "Brazil": "br", "Canada": "ca",
+    "Colombia": "co", "Croatia": "hr", "Ecuador": "ec", "France": "fr",
+    "Iraq": "iq", "Ivory Coast": "ci", "Japan": "jp", "Mexico": "mx",
+    "Morocco": "ma", "Netherlands": "nl", "Norway": "no", "Paraguay": "py",
+    "Portugal": "pt", "Scotland": "gb-sct", "Senegal": "sn", "Sweden": "se",
+    "Switzerland": "ch", "Turkiye": "tr", "USA": "us", "Uruguay": "uy",
 }
 
 
@@ -36,36 +42,10 @@ def _ascii(text: str) -> str:
     return "".join(c for c in text if not unicodedata.combining(c))
 
 
-# ---------------------------------------------------------------- crests ----
-def build_crest_map(token: str | None, nations: list[str]) -> dict:
-    """Build and cache {nation: crest_url} for the given roster nations."""
-    if CRESTS_FILE.exists():
-        cached = json.loads(CRESTS_FILE.read_text())
-        if all(n in cached for n in nations):
-            return cached
-    if not token:
-        return {}
-
-    resp = requests.get(
-        "https://api.football-data.org/v4/competitions/WC/teams",
-        headers={"X-Auth-Token": token},
-        timeout=20,
-    )
-    resp.raise_for_status()
-    api = {t["name"].lower(): t.get("crest") for t in resp.json().get("teams", [])}
-
-    out: dict[str, str] = {}
-    for nation in nations:
-        target = NATION_TEAM_NAMES.get(nation, nation).lower()
-        match = api.get(target) or next(
-            (c for nm, c in api.items() if target in nm or nm in target), None
-        )
-        if match:
-            out[nation] = match
-
-    DATA_DIR.mkdir(exist_ok=True)
-    CRESTS_FILE.write_text(json.dumps(out))
-    return out
+# ----------------------------------------------------------------- flags ----
+def build_flag_map(nations: list[str]) -> dict:
+    """Return {nation: circular-flag-url} for the given roster nations."""
+    return {n: FLAG_BASE.format(code=NATION_ISO[n]) for n in nations if n in NATION_ISO}
 
 
 # ------------------------------------------------------------- headshots ----
