@@ -164,7 +164,7 @@ def main() -> None:
     st.subheader("Top performers")
     rank_metric = st.radio(
         "Rank by",
-        ["Score", "G+A", "Goals", "Assists"],
+        ["Goals", "G+A", "Assists"],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -182,8 +182,8 @@ def main() -> None:
 
     # ---- Sortable / filterable table ----
     st.subheader(f"All players ({len(filtered)})")
-    table_cols = ["Apps", "Goals", "Assists", "Penalties", "G+A", "Score"]
-    display = filtered.sort_values("Score", ascending=False)
+    table_cols = ["Apps", "Goals", "Assists", "Penalties", "G+A"]
+    display = filtered.sort_values("Goals", ascending=False)
     show_cols = ["Headshot", "Player", "Crest", "Nation", "Club", "Position"] + table_cols
     st.dataframe(
         display[show_cols],
@@ -193,7 +193,6 @@ def main() -> None:
         column_config={
             "Headshot": st.column_config.ImageColumn(" "),
             "Crest": st.column_config.ImageColumn(" "),
-            "Score": st.column_config.NumberColumn(format="%.1f"),
         },
     )
     st.caption("Click any column header to sort by it.")

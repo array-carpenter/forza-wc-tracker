@@ -84,7 +84,6 @@ def build_table(
     df["Matched"] = matched_flags
 
     df["G+A"] = df["Goals"] + df["Assists"]
-    df["Score"] = (df["Goals"] * 4 + df["Assists"] * 3).round(1)
 
     df["Crest"] = df["Nation"].map(crest_map or {}).fillna("")
     df["Headshot"] = df["Player"].map(headshot_map or {}).fillna("")
