@@ -202,7 +202,6 @@ def main() -> None:
         nations = st.multiselect("Nation", sorted(df["Nation"].unique()))
         clubs = st.multiselect("Club", sorted(df["Club"].unique()))
         positions = st.multiselect("Position", sorted(df["Position"].unique()))
-        only_matched = st.checkbox("Only players with live stats", value=False)
 
     filtered = df.copy()
     if search:
@@ -213,8 +212,6 @@ def main() -> None:
         filtered = filtered[filtered["Club"].isin(clubs)]
     if positions:
         filtered = filtered[filtered["Position"].isin(positions)]
-    if only_matched:
-        filtered = filtered[filtered["Matched"]]
 
     data_status_banner(payload, int(df["Matched"].sum()), len(df))
 
@@ -227,10 +224,8 @@ def main() -> None:
         label_visibility="collapsed",
     )
     top = filtered.sort_values(rank_metric, ascending=False).head(4)
-    if top[rank_metric].max() == 0:
-        st.info("No goal contributions logged yet. Cards light up once the matches start.")
-    else:
-        cols = st.columns(len(top) if len(top) else 1)
+    if len(top):
+        cols = st.columns(len(top))
         for col, (_, row) in zip(cols, top.iterrows()):
             with col:
                 with st.container(border=True):

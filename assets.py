@@ -23,6 +23,10 @@ CLUBS_FILE = DATA_DIR / "clubs.json"
 # Disambiguate roster club names from foreign clubs that share a name.
 CLUB_ALIAS = {"Inter": "Inter Milan"}
 
+# Hand-picked club badges (relative paths under the project) that beat the API.
+# Juventus's API badge is the white "J"; use the black version instead.
+CLUB_OVERRIDE = {"Juventus": "assets/juventus_black.png"}
+
 UA = {"User-Agent": "Mozilla/5.0"}
 WIKI_UA = {"User-Agent": "forza-wc-tracker/1.0 (personal project)"}
 SPORTSDB_KEY = "3"  # free public test key
@@ -91,7 +95,14 @@ def build_club_map(clubs: list[str]) -> dict:
     if changed:
         DATA_DIR.mkdir(exist_ok=True)
         CLUBS_FILE.write_text(json.dumps(cache))
-    return cache
+
+    # Apply hand-picked overrides (embedded so they render anywhere).
+    result = dict(cache)
+    for club, path in CLUB_OVERRIDE.items():
+        src = _to_src(path)
+        if src:
+            result[club] = src
+    return result
 
 
 # ------------------------------------------------------------- headshots ----
