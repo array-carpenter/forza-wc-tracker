@@ -1,4 +1,4 @@
-"""FORZA CALCIO — 2026 World Cup tracker for Serie A's exported players."""
+"""FORZA CALCIO 2026 World Cup tracker for Serie A's exported players."""
 
 from pathlib import Path
 
@@ -15,7 +15,7 @@ WC_LOGO = ASSETS / "wc_2026_logo.png"
 SERIE_A_LOGO = ASSETS / "serie_a_logo.png"
 
 st.set_page_config(
-    page_title="FORZA CALCIO — World Cup Tracker",
+    page_title="FORZA CALCIO World Cup Tracker",
     page_icon=str(WC_LOGO),
     layout="wide",
 )
@@ -24,6 +24,40 @@ FONT_CSS = """
 <style>
 html, body, [class*="st-"], .stApp, .stApp * {
     font-family: Helvetica, "Helvetica Neue", Arial, sans-serif !important;
+}
+/* Keep Streamlit's Material icon ligatures on their icon font. */
+[data-testid="stIconMaterial"],
+span[class*="material-symbols"],
+span[class*="material-icons"],
+.material-symbols-rounded, .material-symbols-outlined, .material-icons {
+    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined',
+        'Material Icons' !important;
+}
+/* Sidebar: deep-blue panel, white text, white input bars. */
+[data-testid="stSidebar"] {
+    background-color: #0B10A2 !important;
+}
+[data-testid="stSidebar"] * {
+    color: #ffffff !important;
+}
+[data-testid="stSidebar"] hr {
+    border-color: rgba(255, 255, 255, 0.4) !important;
+}
+[data-testid="stSidebar"] input,
+[data-testid="stSidebar"] textarea,
+[data-testid="stSidebar"] [data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+}
+[data-testid="stSidebar"] input,
+[data-testid="stSidebar"] textarea,
+[data-testid="stSidebar"] [data-baseweb="select"] * {
+    color: #111111 !important;
+}
+[data-testid="stSidebar"] .stButton button,
+[data-testid="stSidebar"] .stButton button * {
+    background-color: #ffffff !important;
+    color: #0B10A2 !important;
+    border: none !important;
 }
 </style>
 """
@@ -42,21 +76,14 @@ def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
 
 def data_status_banner(payload: dict, matched: int, total: int) -> None:
     source = payload.get("source")
-    if source == "api":
-        st.success(
-            f"Live data loaded {payload.get('fetched_at', '')} · all {total} "
-            f"players listed · {matched} on the scoresheet so far."
-        )
-    elif source == "no_key":
+    if source == "no_key":
         st.warning(
-            "No token set — showing the roster with empty stats. Add "
+            "No token set. Showing the roster with empty stats. Add "
             "`FOOTBALL_DATA_TOKEN` to `.streamlit/secrets.toml` (free token at "
             "football-data.org), then hit **Refresh stats**."
         )
     elif source == "error":
         st.error(f"Couldn't reach the stats API: {payload.get('error')}")
-    else:
-        st.info("No stats yet — the table will fill in as the tournament plays out.")
 
 
 def player_card(row: pd.Series) -> None:
@@ -87,7 +114,7 @@ def app_header() -> None:
         if WC_LOGO.exists():
             st.image(str(WC_LOGO), width="stretch")
     with mid:
-        st.title("FORZA CALCIO — 2026 World Cup Tracker")
+        st.title("FORZA CALCIO 2026 World Cup Tracker")
         st.caption("Serie A's exported talent, tracked through the 2026 World Cup.")
     with right:
         if SERIE_A_LOGO.exists():
@@ -143,7 +170,7 @@ def main() -> None:
     )
     top = filtered.sort_values(rank_metric, ascending=False).head(4)
     if top[rank_metric].max() == 0:
-        st.info("No goal contributions logged yet — cards light up once the matches start.")
+        st.info("No goal contributions logged yet. Cards light up once the matches start.")
     else:
         cols = st.columns(len(top) if len(top) else 1)
         for col, (_, row) in zip(cols, top.iterrows()):
@@ -155,12 +182,8 @@ def main() -> None:
 
     # ---- Sortable / filterable table ----
     st.subheader(f"All players ({len(filtered)})")
-    sort_col, dir_col = st.columns([3, 1])
     table_cols = ["Apps", "Goals", "Assists", "Penalties", "G+A", "Score"]
-    sort_by = sort_col.selectbox("Sort by", table_cols + ["Player", "Nation", "Club"], index=1)
-    ascending = dir_col.selectbox("Order", ["Descending", "Ascending"]) == "Ascending"
-
-    display = filtered.sort_values(sort_by, ascending=ascending)
+    display = filtered.sort_values("Score", ascending=False)
     show_cols = ["Headshot", "Player", "Crest", "Nation", "Club", "Position"] + table_cols
     st.dataframe(
         display[show_cols],
@@ -173,7 +196,7 @@ def main() -> None:
             "Score": st.column_config.NumberColumn(format="%.1f"),
         },
     )
-    st.caption("Tip: click any column header in the table to sort it directly.")
+    st.caption("Click any column header to sort by it.")
 
 
 if __name__ == "__main__":

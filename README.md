@@ -1,4 +1,4 @@
-# FORZA CALCIO — 2026 World Cup Tracker
+# FORZA CALCIO 2026 World Cup Tracker
 
 A Streamlit app that tracks Serie A's exported players through the 2026 World
 Cup. Top-performer cards sit on top; a filterable, sortable table sits below.
@@ -38,7 +38,7 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 .venv/bin/streamlit run app.py
 ```
 
-The app runs without a token too — it shows the roster with empty stats and a
+The app runs without a token too. It shows the roster with empty stats and a
 banner, then fills in once a token is set and you click **Refresh stats**.
 
 ## Files
@@ -52,7 +52,7 @@ banner, then fills in once a token is set and you click **Refresh stats**.
 | `app.py` | Streamlit UI |
 
 To pin a specific headshot for any player, add an entry to
-`data/headshots_manual.json` — either an image URL or a path to a file bundled
+`data/headshots_manual.json`, either an image URL or a path to a file bundled
 under `assets/headshots/` (handy when a source blocks hotlinking).
 
 ## Data-source notes
