@@ -90,14 +90,22 @@ span[class*="material-icons"],
 """
 
 
+def _safe(fn, *args) -> dict:
+    """Resolve an asset map, degrading to no-images rather than crashing."""
+    try:
+        return fn(*args) or {}
+    except Exception:
+        return {}
+
+
 @st.cache_data(show_spinner="Fetching World Cup stats…")
 def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
     payload = api_client.load_player_stats()
     roster = load_roster()
     nations = sorted(roster["Nation"].unique())
-    flag_map = assets.build_flag_map(nations)
-    headshot_map = assets.resolve_headshots()
-    club_map = assets.build_club_map(sorted(roster["Club"].unique()))
+    flag_map = _safe(assets.build_flag_map, nations)
+    headshot_map = _safe(assets.resolve_headshots)
+    club_map = _safe(assets.build_club_map, sorted(roster["Club"].unique()))
     table = build_table(roster, payload.get("players", []), flag_map, headshot_map, club_map)
     return table, payload
 
@@ -163,7 +171,9 @@ def app_header() -> None:
             st.image(str(WC_LOGO), width="stretch")
     with mid:
         st.title("FORZA CALCIO 2026 World Cup Tracker")
-        st.caption("Serie A's exported talent, tracked through the 2026 World Cup.")
+        st.caption(
+            "Forza Calcio and The Spade present a Serie A/B World Cup Player Stats Tracker"
+        )
     with right:
         if SERIE_A_LOGO.exists():
             st.image(str(SERIE_A_LOGO), width="stretch")
