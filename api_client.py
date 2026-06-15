@@ -5,7 +5,6 @@ goals, assists, yellow/red cards) for every player who features, not just
 scorers. We aggregate those across every completed match. No API key.
 """
 
-import datetime
 import json
 import time
 from pathlib import Path
@@ -13,7 +12,9 @@ from pathlib import Path
 import requests
 
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world"
-WC_START = datetime.date(2026, 6, 11)
+# Fixed tournament window (June 11 - July 19, 2026). Scanning the whole window
+# instead of "today" makes the fetch independent of the server's clock.
+WC_DATES = "20260611-20260719"
 
 # ESPN box-score field -> our column name. All are per-match counts we sum.
 STAT_FIELDS = {
@@ -43,20 +44,15 @@ def get_token() -> None:
 
 
 def _completed_event_ids() -> set[str]:
-    """Every completed World Cup match id from kickoff through today."""
+    """Every completed World Cup match id across the whole tournament window."""
     ids: set[str] = set()
-    day, today = WC_START, datetime.date.today()
-    while day <= today:
-        try:
-            resp = requests.get(
-                f"{ESPN}/scoreboard", params={"dates": day.strftime("%Y%m%d")}, timeout=20
-            )
-            for e in resp.json().get("events", []):
-                if e.get("status", {}).get("type", {}).get("completed"):
-                    ids.add(e["id"])
-        except Exception:
-            pass
-        day += datetime.timedelta(days=1)
+    try:
+        resp = requests.get(f"{ESPN}/scoreboard", params={"dates": WC_DATES}, timeout=30)
+        for e in resp.json().get("events", []):
+            if e.get("status", {}).get("type", {}).get("completed"):
+                ids.add(e["id"])
+    except Exception:
+        pass
     return ids
 
 
