@@ -37,6 +37,30 @@ def build_style() -> str:
 html, body, [class*="st-"], .stApp, .stApp * {{
     font-family: Helvetica, "Helvetica Neue", Arial, sans-serif !important;
 }}
+/* Uniform top-performer cards. */
+.pcard {{
+    border: 1px solid #e6e6e6; border-radius: 12px; background: #fff;
+    padding: 18px 14px; text-align: center;
+}}
+.phead {{
+    width: 88px; height: 88px; border-radius: 50%; object-fit: cover;
+    object-position: top center; display: block; margin: 0 auto 12px; background: #f0f0f0;
+}}
+.pname {{
+    font-weight: 700; font-size: 1rem; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}}
+.pmeta {{
+    color: #555; font-size: 0.85rem; margin-top: 4px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}}
+.picon {{ height: 15px; vertical-align: middle; margin-right: 5px; }}
+.pstats {{ display: flex; justify-content: center; gap: 30px; margin-top: 16px; }}
+.pnum {{ font-size: 1.7rem; font-weight: 700; line-height: 1; }}
+.plbl {{
+    font-size: 0.7rem; color: #808495; text-transform: uppercase;
+    letter-spacing: 0.04em; margin-top: 4px;
+}}
 /* Keep Streamlit's Material icon ligatures on their icon font. */
 [data-testid="stIconMaterial"],
 span[class*="material-symbols"],
@@ -91,31 +115,22 @@ def data_status_banner(payload: dict, matched: int, total: int) -> None:
 
 
 def player_card(row: pd.Series) -> None:
-    photo, crest, club_crest = row.get("Headshot"), row.get("Crest"), row.get("ClubCrest")
-    pic_col, name_col = st.columns([1, 2], vertical_alignment="center")
-    with pic_col:
-        if photo:
-            st.image(photo, width="stretch")
-        elif crest:
-            st.image(crest, width=64)
-    with name_col:
-        crest_img = (
-            f"<img src='{crest}' height='18' style='vertical-align:middle'> " if crest else ""
-        )
-        club_img = (
-            f"<img src='{club_crest}' height='15' style='vertical-align:middle'> "
-            if club_crest else ""
-        )
-        st.markdown(f"**{row['Player']}**")
-        st.markdown(f"{crest_img}{row['Nation']}", unsafe_allow_html=True)
-        st.markdown(
-            f"<span style='color:#808495;font-size:0.85rem'>{club_img}{row['Club']} · "
-            f"{row['Position']} · {int(row['Apps'])} apps</span>",
-            unsafe_allow_html=True,
-        )
-    c1, c2 = st.columns(2)
-    c1.metric("Goals", int(row["Goals"]))
-    c2.metric("Assists", int(row["Assists"]))
+    photo = row.get("Headshot") or row.get("Crest") or ""
+    crest, club_crest = row.get("Crest") or "", row.get("ClubCrest") or ""
+    head = f"<img class='phead' src='{photo}'>" if photo else "<div class='phead'></div>"
+    flag = f"<img class='picon' src='{crest}'>" if crest else ""
+    club = f"<img class='picon' src='{club_crest}'>" if club_crest else ""
+    st.markdown(
+        f"<div class='pcard'>{head}"
+        f"<div class='pname'>{row['Player']}</div>"
+        f"<div class='pmeta'>{flag}{row['Nation']}</div>"
+        f"<div class='pmeta'>{club}{row['Club']} · {row['Position']}</div>"
+        "<div class='pstats'>"
+        f"<div><div class='pnum'>{int(row['Goals'])}</div><div class='plbl'>Goals</div></div>"
+        f"<div><div class='pnum'>{int(row['Assists'])}</div><div class='plbl'>Assists</div></div>"
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def app_header() -> None:
@@ -193,8 +208,7 @@ def main() -> None:
         cols = st.columns(len(top))
         for col, (_, row) in zip(cols, top.iterrows()):
             with col:
-                with st.container(border=True):
-                    player_card(row)
+                player_card(row)
 
     st.divider()
 
