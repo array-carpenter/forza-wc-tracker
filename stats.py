@@ -7,9 +7,7 @@ import pandas as pd
 # Roster nation spelling -> football-data.org nationality spelling.
 NATION_ALIASES = {
     "Turkiye": "Turkey",
-    "Bosnia-Herzegovina": "Bosnia and Herzegovina",
     "USA": "United States",
-    "Ivory Coast": "Ivory Coast",
 }
 
 STAT_COLUMNS = ["Apps", "Goals", "Assists", "Penalties"]
@@ -60,7 +58,12 @@ def _pick_match(row: pd.Series, candidates: list[dict]) -> dict | None:
     return (by_nation or candidates)[0]
 
 
-def build_table(roster: pd.DataFrame, records: list[dict]) -> pd.DataFrame:
+def build_table(
+    roster: pd.DataFrame,
+    records: list[dict],
+    crest_map: dict | None = None,
+    headshot_map: dict | None = None,
+) -> pd.DataFrame:
     """Merge roster with WC scorer stats and add derived performance metrics."""
     index = _index_stats(records)
     df = roster.copy()
@@ -82,5 +85,8 @@ def build_table(roster: pd.DataFrame, records: list[dict]) -> pd.DataFrame:
 
     df["G+A"] = df["Goals"] + df["Assists"]
     df["Score"] = (df["Goals"] * 4 + df["Assists"] * 3).round(1)
+
+    df["Crest"] = df["Nation"].map(crest_map or {}).fillna("")
+    df["Headshot"] = df["Player"].map(headshot_map or {}).fillna("")
 
     return df

@@ -12,6 +12,13 @@ NATION_FIXES = {
     "Ecudaor": "Ecuador",
 }
 
+# Correct misspelled names from the source sheet (display + data matching).
+PLAYER_FIXES = {
+    "Marucs Thuram": "Marcus Thuram",
+    "Glieson Bremer": "Gleison Bremer",
+    "Martin Butarina": "Martín Baturina",
+}
+
 
 def load_roster(path: Path = ROSTER_RAW) -> pd.DataFrame:
     """Read the roster sheet, skipping its empty header padding.
@@ -34,6 +41,7 @@ def load_roster(path: Path = ROSTER_RAW) -> pd.DataFrame:
         df[col] = df[col].str.strip()
 
     df["Nation"] = df["Nation"].replace(NATION_FIXES)
+    df["Player"] = df["Player"].replace(PLAYER_FIXES)
     return df
 
 

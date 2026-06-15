@@ -11,6 +11,8 @@ Cup. Top-performer cards sit on top; a filterable, sortable table sits below.
   roster by accent-normalized name + nationality.
 - Tracks **Apps** (matches played), **Goals**, **Assists**, **Penalties**, plus
   derived **G+A** and a composite **Score**.
+- Shows **national-team crests** (football-data.org) and **player headshots**
+  (TheSportsDB → Wikipedia, with hand-picked overrides) on the cards and table.
 - Filters by nation, club, position, and free-text search; sorts by any stat.
 - Caches the API pull to disk; a **Refresh stats** button re-pulls.
 
@@ -43,10 +45,15 @@ banner, then fills in once a token is set and you click **Refresh stats**.
 
 | File | Role |
 |------|------|
-| `roster.py` | Parse + clean the roster sheet |
+| `roster.py` | Parse + clean the roster sheet (incl. name/nation fixes) |
 | `api_client.py` | Fetch + cache World Cup scorer stats |
+| `assets.py` | Resolve + cache national-team crests and player headshots |
 | `stats.py` | Match roster ↔ stats, compute derived metrics |
 | `app.py` | Streamlit UI |
+
+To pin a specific headshot for any player, add an entry to
+`data/headshots_manual.json` — either an image URL or a path to a file bundled
+under `assets/headshots/` (handy when a source blocks hotlinking).
 
 ## Data-source notes
 
