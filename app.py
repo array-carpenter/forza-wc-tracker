@@ -4,6 +4,7 @@ import base64
 import mimetypes
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -133,6 +134,37 @@ def player_card(row: pd.Series) -> None:
     )
 
 
+def shot_conversion_chart(df: pd.DataFrame) -> None:
+    """Scatter of Goals vs Shots, bubble size = shots on target."""
+    data = df[df["Shots"] > 0].copy()
+    if data.empty:
+        st.info("No shots logged yet — this lights up once your players start firing.")
+        return
+
+    base = alt.Chart(data).encode(
+        x=alt.X("Shots:Q", title="Shots", scale=alt.Scale(zero=True, nice=True)),
+        y=alt.Y("Goals:Q", title="Goals", scale=alt.Scale(zero=True, nice=True)),
+    )
+    points = base.mark_circle(opacity=0.8, stroke="white", strokeWidth=1).encode(
+        size=alt.Size("SOG:Q", title="On target", scale=alt.Scale(range=[80, 900])),
+        color=alt.Color("Position:N", title="Position",
+                        scale=alt.Scale(scheme="tableau10")),
+        tooltip=[
+            alt.Tooltip("Player:N"), alt.Tooltip("Nation:N"), alt.Tooltip("Club:N"),
+            alt.Tooltip("Shots:Q"), alt.Tooltip("SOG:Q", title="On target"),
+            alt.Tooltip("Goals:Q"), alt.Tooltip("Assists:Q"),
+        ],
+    )
+    labels = (
+        alt.Chart(data[(data["Goals"] > 0) | (data["Shots"] >= 4)])
+        .mark_text(align="left", dx=10, dy=-2, fontSize=11, color="#333")
+        .encode(x="Shots:Q", y="Goals:Q", text="Player:N")
+    )
+    chart = (points + labels).properties(height=460, width="container").interactive()
+    st.altair_chart(chart, theme="streamlit")
+    st.caption("Bubble size = shots on target. Hover for detail; scroll to zoom.")
+
+
 def app_header() -> None:
     st.markdown(build_style(), unsafe_allow_html=True)
 
@@ -209,6 +241,12 @@ def main() -> None:
         for col, (_, row) in zip(cols, top.iterrows()):
             with col:
                 player_card(row)
+
+    st.divider()
+
+    # ---- Shot conversion ----
+    st.subheader("Shot conversion")
+    shot_conversion_chart(filtered)
 
     st.divider()
 
