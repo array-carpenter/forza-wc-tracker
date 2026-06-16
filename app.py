@@ -75,6 +75,16 @@ html, body, [class*="st-"], .stApp, .stApp * {{
     font-size: 0.7rem; color: #808495; text-transform: uppercase;
     letter-spacing: 0.04em; margin-top: 4px;
 }}
+/* Header World Cup logo — capped so it can't balloon on mobile. */
+.wclogo img {{ width: 74px; height: auto; display: block; }}
+/* Mobile tweaks. */
+@media (max-width: 640px) {{
+    .stApp h1 {{ font-size: 1.5rem !important; }}
+    .wclogo img {{ width: 50px; }}
+    .pcard {{ padding: 14px 9px; }}
+    .pstats {{ gap: 16px; }}
+    .pnum {{ font-size: 1.4rem; }}
+}}
 /* Keep Streamlit's Material icon ligatures on their icon font. */
 [data-testid="stIconMaterial"],
 span[class*="material-symbols"],
@@ -280,7 +290,10 @@ def app_header() -> None:
     left, mid = st.columns([1, 7], vertical_alignment="center")
     with left:
         if WC_LOGO.exists():
-            st.image(str(WC_LOGO), width="stretch")
+            st.markdown(
+                f"<div class='wclogo'><img src='{_data_uri(WC_LOGO)}'></div>",
+                unsafe_allow_html=True,
+            )
     with mid:
         st.title("FORZA CALCIO 2026 World Cup Tracker")
         st.caption(
@@ -384,6 +397,10 @@ def main() -> None:
         column_config=column_config,
     )
     st.caption("Click any column header to sort by it.")
+    with st.expander("Stat key"):
+        st.markdown(
+            "  ·  ".join(f"**{header}** {tip}" for _, header, tip in stat_meta)
+        )
 
     st.divider()
 
