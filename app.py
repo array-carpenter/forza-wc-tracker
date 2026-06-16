@@ -254,7 +254,11 @@ def match_report_chart(report: dict) -> None:
     a_text = alt.Chart(data[data["Team"] == away["name"]]).mark_text(
         align="left", dx=6, color="#333").encode(y=alt.Y("Metric:N", sort=order),
                                                   x="x:Q", text="Label:N")
-    chart = (bars + h_text + a_text).properties(height=300, width="container")
+    chart = (bars + h_text + a_text).properties(
+        height=300, width="container",
+        padding={"left": 90, "right": 50, "top": 10, "bottom": 10},
+        autosize=alt.AutoSizeParams(type="fit", contains="padding"),
+    )
     st.altair_chart(chart, theme="streamlit")
 
 
