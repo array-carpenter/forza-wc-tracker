@@ -111,7 +111,7 @@ def _cache_is_fresh(cached: dict) -> bool:
 def load_player_stats(force_refresh: bool = False) -> dict:
     """Return WC player stats, refetching from ESPN when the cache is stale."""
     if CACHE_FILE.exists() and not force_refresh:
-        cached = json.loads(CACHE_FILE.read_text())
+        cached = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
         if _cache_is_fresh(cached):
             return cached
     try:
@@ -122,7 +122,7 @@ def load_player_stats(force_refresh: bool = False) -> dict:
             "source": "espn",
         }
         CACHE_DIR.mkdir(exist_ok=True)
-        CACHE_FILE.write_text(json.dumps(result))
+        CACHE_FILE.write_text(json.dumps(result), encoding="utf-8")
         return result
     except Exception as exc:
         return {"fetched_at": None, "players": [], "source": "error", "error": str(exc)}

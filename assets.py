@@ -82,7 +82,7 @@ def build_club_map(clubs: list[str]) -> dict:
     """Build/extend {club: badge_url}, fetching only uncached clubs."""
     cache: dict[str, str] = {}
     if CLUBS_FILE.exists():
-        cache = json.loads(CLUBS_FILE.read_text())
+        cache = json.loads(CLUBS_FILE.read_text(encoding="utf-8"))
 
     changed = False
     for club in clubs:
@@ -94,7 +94,7 @@ def build_club_map(clubs: list[str]) -> dict:
 
     if changed:
         DATA_DIR.mkdir(exist_ok=True)
-        CLUBS_FILE.write_text(json.dumps(cache))
+        CLUBS_FILE.write_text(json.dumps(cache), encoding="utf-8")
 
     # Apply hand-picked overrides (embedded so they render anywhere).
     result = dict(cache)
@@ -163,7 +163,7 @@ def build_headshot_map(players: list[tuple[str, str]]) -> dict:
     """
     cache: dict[str, str] = {}
     if HEADSHOTS_FILE.exists():
-        cache = json.loads(HEADSHOTS_FILE.read_text())
+        cache = json.loads(HEADSHOTS_FILE.read_text(encoding="utf-8"))
 
     changed = False
     for name, club in players:
@@ -176,7 +176,7 @@ def build_headshot_map(players: list[tuple[str, str]]) -> dict:
 
     if changed:
         DATA_DIR.mkdir(exist_ok=True)
-        HEADSHOTS_FILE.write_text(json.dumps(cache))
+        HEADSHOTS_FILE.write_text(json.dumps(cache), encoding="utf-8")
 
     return resolve_headshots(cache)
 
@@ -200,10 +200,10 @@ def _to_src(value: str) -> str:
 def resolve_headshots(cache: dict | None = None) -> dict:
     """Merge the auto cache with hand-picked overrides (overrides win)."""
     if cache is None:
-        cache = json.loads(HEADSHOTS_FILE.read_text()) if HEADSHOTS_FILE.exists() else {}
+        cache = json.loads(HEADSHOTS_FILE.read_text(encoding="utf-8")) if HEADSHOTS_FILE.exists() else {}
     merged = dict(cache)
     if HEADSHOTS_MANUAL_FILE.exists():
-        for name, url in json.loads(HEADSHOTS_MANUAL_FILE.read_text()).items():
+        for name, url in json.loads(HEADSHOTS_MANUAL_FILE.read_text(encoding="utf-8")).items():
             if url:
                 merged[name] = _to_src(url)
     return merged

@@ -87,8 +87,14 @@ def build_table(
     df = pd.concat([df.reset_index(drop=True), stats_df], axis=1)
     df["Matched"] = matched_flags
 
+    # Match images by NFC-normalized name so accented keys (Kolašinac,
+    # Çalhanoğlu) line up regardless of how each file encoded them.
+    def _nfc(s: str) -> str:
+        return unicodedata.normalize("NFC", s)
+
+    heads = {_nfc(k): v for k, v in (headshot_map or {}).items()}
     df["Crest"] = df["Nation"].map(crest_map or {}).fillna("")
-    df["Headshot"] = df["Player"].map(headshot_map or {}).fillna("")
+    df["Headshot"] = df["Player"].map(lambda p: heads.get(_nfc(p), "")).fillna("")
     df["ClubCrest"] = df["Club"].map(club_map or {}).fillna("")
 
     return df

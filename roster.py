@@ -26,7 +26,7 @@ def load_roster(path: Path = ROSTER_RAW) -> pd.DataFrame:
     The exported Google Sheet has six blank rows before the real header,
     so we find the 'Player' header row and parse from there.
     """
-    raw = pd.read_csv(path, header=None, dtype=str, keep_default_na=False)
+    raw = pd.read_csv(path, header=None, dtype=str, keep_default_na=False, encoding="utf-8")
 
     header_idx = raw.index[raw[0].str.strip() == "Player"]
     if len(header_idx) == 0:
