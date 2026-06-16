@@ -56,7 +56,7 @@ html, body, [class*="st-"], .stApp, .stApp * {{
     overflow: hidden; text-overflow: ellipsis;
 }}
 .picon {{ height: 15px; vertical-align: middle; margin-right: 5px; }}
-.pstats {{ display: flex; justify-content: center; gap: 30px; margin-top: 16px; }}
+.pstats {{ display: flex; justify-content: center; gap: 22px; margin-top: 16px; }}
 .pnum {{ font-size: 1.7rem; font-weight: 700; line-height: 1; }}
 .plbl {{
     font-size: 0.7rem; color: #808495; text-transform: uppercase;
@@ -98,7 +98,7 @@ def _safe(fn, *args) -> dict:
         return {}
 
 
-@st.cache_data(show_spinner="Fetching World Cup stats…")
+@st.cache_data(ttl=api_client.CACHE_TTL_SECONDS, show_spinner="Fetching World Cup stats…")
 def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
     payload = api_client.load_player_stats()
     roster = load_roster()
@@ -108,6 +108,16 @@ def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
     club_map = _safe(assets.build_club_map, sorted(roster["Club"].unique()))
     table = build_table(roster, payload.get("players", []), flag_map, headshot_map, club_map)
     return table, payload
+
+
+@st.cache_data(ttl=api_client.CACHE_TTL_SECONDS, show_spinner=False)
+def get_matches(refresh_token: int) -> list[dict]:
+    return api_client.list_matches()
+
+
+@st.cache_data(ttl=api_client.CACHE_TTL_SECONDS, show_spinner=False)
+def get_match_report(event_id: str) -> dict | None:
+    return api_client.match_report(event_id)
 
 
 def data_status_banner(payload: dict, matched: int, total: int) -> None:
@@ -127,6 +137,7 @@ def player_card(row: pd.Series) -> None:
         f"<div class='pmeta'>{flag}{row['Nation']}</div>"
         f"<div class='pmeta'>{club}{row['Club']} · {row['Position']}</div>"
         "<div class='pstats'>"
+        f"<div><div class='pnum'>{int(row['Apps'])}</div><div class='plbl'>Apps</div></div>"
         f"<div><div class='pnum'>{int(row['Goals'])}</div><div class='plbl'>Goals</div></div>"
         f"<div><div class='pnum'>{int(row['Assists'])}</div><div class='plbl'>Assists</div></div>"
         "</div></div>",
@@ -142,11 +153,16 @@ def shot_conversion_chart(df: pd.DataFrame) -> None:
         return
 
     base = alt.Chart(data).encode(
-        x=alt.X("Shots:Q", title="Shots", scale=alt.Scale(zero=True, nice=True)),
-        y=alt.Y("Goals:Q", title="Goals", scale=alt.Scale(zero=True, nice=True)),
+        x=alt.X("Shots:Q", title="Shots", scale=alt.Scale(zero=True, nice=True),
+                axis=alt.Axis(format="d", tickMinStep=1)),
+        y=alt.Y("Goals:Q", title="Goals", scale=alt.Scale(zero=True, nice=True),
+                axis=alt.Axis(format="d", tickMinStep=1)),
     )
+    sog_max = int(data["SOG"].max())
+    sog_values = list(range(1, sog_max + 1)) or [1]
     points = base.mark_circle(opacity=0.8, stroke="white", strokeWidth=1).encode(
-        size=alt.Size("SOG:Q", title="On target", scale=alt.Scale(range=[80, 900])),
+        size=alt.Size("SOG:Q", title="On target", scale=alt.Scale(range=[80, 900]),
+                      legend=alt.Legend(format="d", values=sog_values)),
         color=alt.Color("Position:N", title="Position",
                         scale=alt.Scale(scheme="tableau10")),
         tooltip=[
@@ -163,6 +179,64 @@ def shot_conversion_chart(df: pd.DataFrame) -> None:
     chart = (points + labels).properties(height=460, width="container").interactive()
     st.altair_chart(chart, theme="streamlit")
     st.caption("Bubble size = shots on target. Hover for detail; scroll to zoom.")
+
+
+def _num(v) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def match_report_chart(report: dict) -> None:
+    """Back-to-back comparison bars of two teams' match stats."""
+    home, away = report.get("home"), report.get("away")
+    if not home or not away:
+        st.info("No team stats available for this match.")
+        return
+
+    hc, _, ac = st.columns([3, 1, 3], vertical_alignment="center")
+    hc.markdown(
+        f"<div style='text-align:right;font-size:1.1rem;font-weight:700'>{home['name']} "
+        f"<img src='{home['logo']}' height='30' style='vertical-align:middle'></div>",
+        unsafe_allow_html=True,
+    )
+    ac.markdown(
+        f"<div style='font-size:1.1rem;font-weight:700'>"
+        f"<img src='{away['logo']}' height='30' style='vertical-align:middle'> {away['name']}</div>",
+        unsafe_allow_html=True,
+    )
+
+    rows = []
+    for key, label in api_client.REPORT_METRICS:
+        hv, av = _num(home["stats"].get(key)), _num(away["stats"].get(key))
+        total = hv + av or 1
+        is_pct = key.endswith("Pct")
+        fmt = (lambda x: f"{x:.1f}%") if is_pct else (lambda x: f"{int(round(x))}")
+        rows.append({"Metric": label, "Team": home["name"], "x": -(hv / total),
+                     "Value": hv, "Label": fmt(hv)})
+        rows.append({"Metric": label, "Team": away["name"], "x": av / total,
+                     "Value": av, "Label": fmt(av)})
+    data = pd.DataFrame(rows)
+    order = [label for _, label in api_client.REPORT_METRICS]
+    color = alt.Color("Team:N", scale=alt.Scale(domain=[home["name"], away["name"]],
+                                                 range=["#002bfc", "#ff6b35"]),
+                      legend=None)
+
+    bars = alt.Chart(data).mark_bar(height=20).encode(
+        y=alt.Y("Metric:N", sort=order, title=None, axis=alt.Axis(labelFontWeight="bold")),
+        x=alt.X("x:Q", title=None, axis=None, scale=alt.Scale(domain=[-1, 1])),
+        color=color,
+        tooltip=["Team:N", "Metric:N", alt.Tooltip("Value:Q")],
+    )
+    h_text = alt.Chart(data[data["Team"] == home["name"]]).mark_text(
+        align="right", dx=-6, color="#333").encode(y=alt.Y("Metric:N", sort=order),
+                                                    x="x:Q", text="Label:N")
+    a_text = alt.Chart(data[data["Team"] == away["name"]]).mark_text(
+        align="left", dx=6, color="#333").encode(y=alt.Y("Metric:N", sort=order),
+                                                  x="x:Q", text="Label:N")
+    chart = (bars + h_text + a_text).properties(height=300, width="container")
+    st.altair_chart(chart, theme="streamlit")
 
 
 def app_header() -> None:
@@ -203,6 +277,9 @@ def main() -> None:
             api_client.clear_cache()
             st.session_state.refresh_token += 1
             get_data.clear()
+            get_matches.clear()
+            get_match_report.clear()
+        st.caption("Auto-refreshes ~3x a day.")
         st.divider()
 
     df, payload = get_data(st.session_state.refresh_token)
@@ -231,7 +308,7 @@ def main() -> None:
     st.subheader("Top performers")
     rank_metric = st.radio(
         "Rank by",
-        [m for m in ["Goals", "Assists", "Shots", "Apps"] if m in filtered.columns],
+        [m for m in ["Goals", "Assists", "Apps"] if m in filtered.columns],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -241,12 +318,6 @@ def main() -> None:
         for col, (_, row) in zip(cols, top.iterrows()):
             with col:
                 player_card(row)
-
-    st.divider()
-
-    # ---- Shot conversion ----
-    st.subheader("Shot conversion")
-    shot_conversion_chart(filtered)
 
     st.divider()
 
@@ -290,6 +361,32 @@ def main() -> None:
         column_config=column_config,
     )
     st.caption("Click any column header to sort by it.")
+
+    st.divider()
+
+    # ---- Shot conversion ----
+    st.subheader("Shot conversion")
+    shot_conversion_chart(filtered)
+
+    st.divider()
+
+    # ---- Match report ----
+    st.subheader("Match report")
+    matches = get_matches(st.session_state.refresh_token)
+    if not matches:
+        st.info("No completed matches yet.")
+    else:
+        labels = {
+            f"{m['home']['name']} {m['home']['score']}–{m['away']['score']} "
+            f"{m['away']['name']}  ({m['date']})": m["id"]
+            for m in matches
+        }
+        pick = st.selectbox("Match", list(labels), index=len(labels) - 1)
+        report = get_match_report(labels[pick])
+        if report:
+            match_report_chart(report)
+        else:
+            st.info("Couldn't load this match's stats.")
 
 
 if __name__ == "__main__":
