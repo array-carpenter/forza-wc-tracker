@@ -18,6 +18,19 @@ WC_LOGO = ASSETS / "wc_2026_logo.png"
 SPADE_LOGO = ASSETS / "spade_soccer_logo.png"
 FORZA_LOGO = ASSETS / "forza_calcio_white.png"
 
+# Kept local (not pulled from api_client) so a stale-module deploy can't crash
+# app.py at import time.
+REFRESH_TTL = 8 * 3600  # auto-refresh roughly 3x a day
+REPORT_METRICS = [
+    ("possessionPct", "Possession %"),
+    ("totalShots", "Shots"),
+    ("shotsOnTarget", "On target"),
+    ("totalPasses", "Passes"),
+    ("wonCorners", "Corners"),
+    ("totalTackles", "Tackles"),
+    ("foulsCommitted", "Fouls"),
+]
+
 st.set_page_config(
     page_title="FORZA CALCIO World Cup Tracker",
     page_icon=str(WC_LOGO),
@@ -98,7 +111,7 @@ def _safe(fn, *args) -> dict:
         return {}
 
 
-@st.cache_data(ttl=api_client.CACHE_TTL_SECONDS, show_spinner="Fetching World Cup stats…")
+@st.cache_data(ttl=REFRESH_TTL, show_spinner="Fetching World Cup stats…")
 def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
     payload = api_client.load_player_stats()
     roster = load_roster()
@@ -110,14 +123,20 @@ def get_data(refresh_token: int) -> tuple[pd.DataFrame, dict]:
     return table, payload
 
 
-@st.cache_data(ttl=api_client.CACHE_TTL_SECONDS, show_spinner=False)
+@st.cache_data(ttl=REFRESH_TTL, show_spinner=False)
 def get_matches(refresh_token: int) -> list[dict]:
-    return api_client.list_matches()
+    try:
+        return api_client.list_matches()
+    except Exception:
+        return []
 
 
-@st.cache_data(ttl=api_client.CACHE_TTL_SECONDS, show_spinner=False)
+@st.cache_data(ttl=REFRESH_TTL, show_spinner=False)
 def get_match_report(event_id: str) -> dict | None:
-    return api_client.match_report(event_id)
+    try:
+        return api_client.match_report(event_id)
+    except Exception:
+        return None
 
 
 def data_status_banner(payload: dict, matched: int, total: int) -> None:
@@ -208,7 +227,7 @@ def match_report_chart(report: dict) -> None:
     )
 
     rows = []
-    for key, label in api_client.REPORT_METRICS:
+    for key, label in REPORT_METRICS:
         hv, av = _num(home["stats"].get(key)), _num(away["stats"].get(key))
         total = hv + av or 1
         is_pct = key.endswith("Pct")
@@ -218,7 +237,7 @@ def match_report_chart(report: dict) -> None:
         rows.append({"Metric": label, "Team": away["name"], "x": av / total,
                      "Value": av, "Label": fmt(av)})
     data = pd.DataFrame(rows)
-    order = [label for _, label in api_client.REPORT_METRICS]
+    order = [label for _, label in REPORT_METRICS]
     color = alt.Color("Team:N", scale=alt.Scale(domain=[home["name"], away["name"]],
                                                  range=["#002bfc", "#ff6b35"]),
                       legend=None)
